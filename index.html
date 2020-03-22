@@ -1,0 +1,151 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>Agent Chat Room</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Place favicon.ico in the root directory -->
+
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/main.css">
+
+  <meta name="theme-color" content="#fafafa">
+</head>
+<style>
+  input {
+    border: 1px solid black
+  }
+</style>
+<body>
+<h1>Agent Chat Room</h1>
+<div id="main-container">
+  <div id="login-form">
+    <form id="submit-login">
+      Username : <input type="text" name="username"><br>
+      <button>Login</button>
+    </form>
+  </div>
+  <div id="room-container">
+
+  </div>
+  <div id="chat-container">
+    <div id="message-container" style="text-align: left">
+
+    </div>
+    <div>
+      <form id="send-message">
+        <input type="hidden" name="token" required>
+        <input type="text" name="message" required>
+        <input type="hidden" name="actor" value="agent" required>
+        <button type="submit" >Send</button>
+      </form>
+      <form id="resolve-room">
+        <input type="hidden" name="token" required>
+        <button type="submit" >Resolve</button>
+      </form>
+      <br>
+    </div>
+  </div>
+  <button id="dologout">Logout</button>
+</div>
+<script src="js/vendor/modernizr-3.8.0.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+<script>window.jQuery || document.write('<script src="js/vendor/jquery-3.4.1.min.js"><\/script>')</script>
+<script>
+  var api = 'http://localhost/project/ChatRoom/chatroom-api/public/';
+  var timeout1;
+  var timeout2;
+  $('#chat-container').hide();
+  $('#dologout').hide();
+  $('#room-container').hide();
+  $('#submit-login').on('submit', function (e) {
+    e.preventDefault();
+    var data = $(this).serialize();
+    $.post(api + 'agent/login', data)
+      .then(function (res) {
+        if (typeof res.id != 'undefined') {
+          localStorage.setItem('id', res.id);
+          getChatRoom(res.id);
+        }
+      })
+  });
+  if (localStorage.getItem('id')) {
+    var id = localStorage.getItem('id');
+    getChatRoom(id);
+  }
+
+  function getChatRoom(id) {
+    $('#dologout').show();
+    $.get(api + 'agent/get-chat-room/' + id)
+      .then(function (res) {
+        $('#login-form').hide();
+        $('#room-container').show();
+        if (res.length) {
+          var room = res.map(function (val) {
+            return '<a href="#" onclick="getMessage(this,1)" data-token="' + val.token + '">Chat Room #' + val.id + '</a><br>'
+          });
+          $('#room-container').html(room);
+        } else {
+          $('#room-container').html('No Active Chat Room');
+        }
+        timeout1 = setTimeout(function () {
+          getChatRoom(id)
+        },5000)
+      })
+  }
+
+  function getMessage(e,show) {
+    var token = $(e).data('token');
+    if (show) {
+      $('[name=token]').val(token);
+    }
+    $('#chat-container').show();
+    $.get(api + 'chat-room/' + token)
+      .then(function (res) {
+        var msg = res.messages.map(function (val) {
+          return '<p>' + val.actor + ' : ' + val.message + '</p>'
+        });
+        if (!$('#message-container>#'+token).length){
+          $('#message-container').append('<div id="'+token+'"></div>');
+        }
+        $('#'+token).html(msg);
+        if (show) {
+          $('#' + token).show().siblings().hide();
+        }
+        timeout2 = setTimeout(function () {
+          getMessage(e,0);
+        },1000)
+      })
+  }
+  $('#send-message').on('submit', function (e) {
+    var token = $('[name=token]').val();
+    e.preventDefault();
+    var data = $(this).serialize();
+    $.post(api + 'chat-room/' + token, data)
+      .then(function (res) {
+        $('#send-message')[0].reset();
+      })
+  })
+  $('#resolve-room').on('submit', function (e) {
+    var token = $('[name=token]').val();
+    e.preventDefault();
+    $.post(api + 'agent/resolve-room/' + token)
+      .then(function (res) {})
+  })
+  $('#dologout').click(function (e) {
+    e.preventDefault();
+    localStorage.removeItem('id');
+    $('#login-form').show().siblings().hide();
+    clearTimeout(timeout1);
+    clearTimeout(timeout2);
+  })
+</script>
+</body>
+
+</html>
